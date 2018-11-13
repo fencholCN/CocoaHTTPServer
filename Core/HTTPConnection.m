@@ -11,6 +11,9 @@
 #import "HTTPAsyncFileResponse.h"
 #import "WebSocket.h"
 #import "HTTPLogging.h"
+#if TARGET_OS_IPHONE
+#import <MobileCoreServices/MobileCoreServices.h>
+#endif
 
 #if ! __has_feature(objc_arc)
 #warning This file must be compiled with ARC. Use -fobjc-arc flag (or convert project to ARC).
@@ -1214,6 +1217,23 @@ static NSMutableArray *recentNonces;
 	}
 	else
 	{
+#if TARGET_OS_IPHONE
+        /* add the proper MIME type */
+        NSString *mimeType;
+        NSString *extension = request.url.pathExtension;
+        if ([httpResponse respondsToSelector:@selector(contentType)])
+            mimeType = [httpResponse contentType];
+
+        if (!mimeType)
+            mimeType = [self fileMIMEType:extension];
+
+        if (!mimeType) {
+            if ([extension isEqualToString:@"css"])
+                mimeType = @"text/css";
+        }
+        [response setHeaderField:@"Content-Type" value:mimeType];
+#endif
+
 		// Write the header response
 		NSData *responseData = [self preprocessResponse:response];
 		[asyncSocket writeData:responseData withTimeout:TIMEOUT_WRITE_HEAD tag:HTTP_PARTIAL_RESPONSE_HEADER];
@@ -2652,6 +2672,19 @@ static NSMutableArray *recentNonces;
 	// This will allow our server to release us from its array of connections
 	[[NSNotificationCenter defaultCenter] postNotificationName:HTTPConnectionDidDieNotification object:self];
 }
+
+#pragma mark - helpers
+#if TARGET_OS_IPHONE
+- (NSString *)fileMIMEType:(NSString *)extension
+{
+    CFStringRef UTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension,
+                                                            (__bridge CFStringRef)extension,
+                                                            NULL);
+    CFStringRef MIMEType = UTTypeCopyPreferredTagWithClass (UTI, kUTTagClassMIMEType);
+    CFRelease(UTI);
+    return CFBridgingRelease(MIMEType);
+}
+#endif
 
 @end
 

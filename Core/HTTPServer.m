@@ -215,6 +215,30 @@ static const int httpLogLevel = HTTP_LOG_LEVEL_INFO; // | HTTP_LOG_FLAG_TRACE;
 }
 
 /**
+ * IP versions
+**/
+
+- (BOOL)IPv4Enabled
+{
+    return asyncSocket.isIPv4Enabled;
+}
+
+- (void)setIPv4Enabled:(BOOL)IPv4Enabled
+{
+    [asyncSocket setIPv4Enabled:IPv4Enabled];
+}
+
+- (BOOL)IPv6Enabled
+{
+    return asyncSocket.isIPv6Enabled;
+}
+
+- (void)setIPv6Enabled:(BOOL)IPv6Enabled
+{
+    [asyncSocket setIPv6Enabled:IPv6Enabled];
+}
+
+/**
  * The port to listen for connections on.
  * By default this port is initially set to zero, which allows the kernel to pick an available port for us.
  * After the HTTP server has started, the port being used may be obtained by this method.
@@ -568,7 +592,7 @@ static const int httpLogLevel = HTTP_LOG_LEVEL_INFO; // | HTTP_LOG_FLAG_TRACE;
 	if (type)
 	{
 		netService = [[NSNetService alloc] initWithDomain:domain type:type name:name port:[asyncSocket localPort]];
-		[netService setDelegate:self];
+		netService.delegate = self;
 		
 		NSNetService *theNetService = netService;
 		NSData *txtRecordData = nil;
@@ -576,8 +600,6 @@ static const int httpLogLevel = HTTP_LOG_LEVEL_INFO; // | HTTP_LOG_FLAG_TRACE;
 			txtRecordData = [NSNetService dataFromTXTRecordDictionary:txtRecordDictionary];
 		
 		dispatch_block_t bonjourBlock = ^{
-			
-			[theNetService removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 			[theNetService scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 			[theNetService publish];
 			
@@ -603,10 +625,11 @@ static const int httpLogLevel = HTTP_LOG_LEVEL_INFO; // | HTTP_LOG_FLAG_TRACE;
 	if (netService)
 	{
 		NSNetService *theNetService = netService;
+        netService.delegate = nil;
 		
 		dispatch_block_t bonjourBlock = ^{
-			
 			[theNetService stop];
+            [theNetService removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 		};
 		
 		[[self class] performBonjourBlock:bonjourBlock];
